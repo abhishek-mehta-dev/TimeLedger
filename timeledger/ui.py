@@ -70,6 +70,78 @@ class ModernConfirmDialog(tk.Toplevel):
         self.destroy()
 
 
+class ModernInfoDialog(tk.Toplevel):
+    """Custom premium-styled information dialog."""
+    def __init__(self, parent, title, message, colors):
+        super().__init__(parent)
+        self.colors = colors
+        
+        self.title(title)
+        self.geometry("400x220")
+        self.resizable(False, False)
+        self.configure(bg=colors['bg'])
+        
+        self.transient(parent)
+        self.grab_set()
+        
+        container = tk.Frame(self, bg=colors['bg'], padx=30, pady=30)
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(
+            container, text="🎉 Success!", font=('Segoe UI', 14, 'bold'), 
+            fg=colors['success'], bg=colors['bg']
+        ).pack(pady=(0, 15))
+        
+        tk.Label(
+            container, text=message, font=('Segoe UI', 10), 
+            fg=colors['text'], bg=colors['bg'], wraplength=340, justify='center'
+        ).pack(pady=(0, 25))
+        
+        tk.Button(
+            container, text="Excellent", font=('Segoe UI', 10, 'bold'),
+            bg=colors['primary'], fg='white', relief=tk.FLAT,
+            padx=30, pady=8, cursor='hand2', command=self.destroy
+        ).pack(fill=tk.X)
+        
+        self.wait_window()
+
+
+class ModernErrorDialog(tk.Toplevel):
+    """Custom premium-styled error dialog."""
+    def __init__(self, parent, title, message, colors):
+        super().__init__(parent)
+        self.colors = colors
+        
+        self.title(title)
+        self.geometry("400x220")
+        self.resizable(False, False)
+        self.configure(bg=colors['bg'])
+        
+        self.transient(parent)
+        self.grab_set()
+        
+        container = tk.Frame(self, bg=colors['bg'], padx=30, pady=30)
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(
+            container, text="⚠️ Attention", font=('Segoe UI', 14, 'bold'), 
+            fg=colors['danger'], bg=colors['bg']
+        ).pack(pady=(0, 15))
+        
+        tk.Label(
+            container, text=message, font=('Segoe UI', 10), 
+            fg=colors['text'], bg=colors['bg'], wraplength=340, justify='center'
+        ).pack(pady=(0, 25))
+        
+        tk.Button(
+            container, text="Close", font=('Segoe UI', 10, 'bold'),
+            bg=colors['border'], fg=colors['muted'], relief=tk.FLAT,
+            padx=30, pady=8, cursor='hand2', command=self.destroy
+        ).pack(fill=tk.X)
+        
+        self.wait_window()
+
+
 class ModernInputDialog(tk.Toplevel):
     """Custom premium-styled input dialog."""
     def __init__(self, parent, title, prompt, colors):
@@ -394,7 +466,8 @@ class TimeLedgerApp:
         try:
             self.tracker.start_work()
             self._update_status()
-        except Exception as e: messagebox.showerror("Error", str(e))
+        except Exception as e: 
+            ModernErrorDialog(self.root, "Error", str(e), self.colors)
 
     def _on_pause(self):
         diag = ModernInputDialog(
@@ -406,13 +479,15 @@ class TimeLedgerApp:
             try:
                 self.tracker.pause_work(diag.result)
                 self._update_status()
-            except Exception as e: messagebox.showerror("Error", str(e))
+            except Exception as e: 
+                ModernErrorDialog(self.root, "Error", str(e), self.colors)
 
     def _on_resume(self):
         try:
             self.tracker.resume_work()
             self._update_status()
-        except Exception as e: messagebox.showerror("Error", str(e))
+        except Exception as e: 
+            ModernErrorDialog(self.root, "Error", str(e), self.colors)
 
     def _on_end(self):
         diag = ModernConfirmDialog(
@@ -431,13 +506,15 @@ class TimeLedgerApp:
                     self.colors
                 )
                 if rep_diag.result: self._on_generate_report()
-            except Exception as e: messagebox.showerror("Error", str(e))
+            except Exception as e: 
+                ModernErrorDialog(self.root, "Error", str(e), self.colors)
 
     def _on_generate_report(self):
         try:
             path = generate_today_report()
-            messagebox.showinfo("Success", f"Report saved: {path}")
-        except Exception as e: messagebox.showerror("Error", str(e))
+            ModernInfoDialog(self.root, "Success", f"Report saved:\n{path}", self.colors)
+        except Exception as e: 
+            ModernErrorDialog(self.root, "Error", str(e), self.colors)
 
     def on_closing(self):
         if self._timer_id: self.root.after_cancel(self._timer_id)
