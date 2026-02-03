@@ -300,26 +300,6 @@ class TimeLedgerApp:
             card['frame'].grid(row=r, column=c, padx=padx, pady=8, sticky='nsew')
             self.cards[key] = card
 
-        # --- Memo Area ---
-        tk.Label(self.main_container, text="Memo", font=('Segoe UI', 11, 'bold'), fg=self.colors['text'], bg=self.colors['bg']).pack(anchor='w', pady=(0, 8))
-        self.memo_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
-        self.memo_frame.pack(fill=tk.X, pady=(0, 30))
-        
-        self.memo_entry = tk.Entry(
-            self.memo_frame, 
-            font=('Segoe UI', 11),
-            bg=self.colors['card'], 
-            fg=self.colors['text'],
-            relief=tk.FLAT,
-            highlightbackground=self.colors['border'],
-            highlightthickness=1,
-            insertbackground=self.colors['primary']
-        )
-        self.memo_entry.pack(fill=tk.X, ipady=10, padx=2)
-        self.memo_entry.insert(0, "Enter your text...")
-        self.memo_entry.bind("<FocusIn>", lambda e: self.memo_entry.delete(0, tk.END) if self.memo_entry.get() == "Enter your text..." else None)
-        self.memo_entry.bind("<Return>", lambda e: self.root.focus_set())
-
         # --- Primary Controls ---
         btns_container = tk.Frame(self.main_container, bg=self.colors['bg'])
         btns_container.pack(fill=tk.X)
@@ -431,13 +411,13 @@ class TimeLedgerApp:
 
     def _update_timer(self):
         if self.tracker and self.db_connected:
-            # Current Session
-            elapsed = self.tracker.get_elapsed_work_time()
-            self.cards['session']['label'].configure(text=self._format_seconds(elapsed))
+            # Current Session (Interval since last Start/Resume)
+            session_elapsed = self.tracker.get_current_session_time()
+            self.cards['session']['label'].configure(text=self._format_seconds(session_elapsed))
             
-            # Today
-            today_stats = self.tracker.get_today_stats()
-            self.cards['today']['label'].configure(text=self._format_seconds(today_stats.work_seconds))
+            # Today Total (Cumulative for the day)
+            today_elapsed = self.tracker.get_elapsed_work_time()
+            self.cards['today']['label'].configure(text=self._format_seconds(today_elapsed))
             
             # Week & Month (maybe only update every 10s to be efficient)
             if not hasattr(self, '_long_update_counter'): self._long_update_counter = 0

@@ -62,6 +62,7 @@ class WorkTracker:
         self._work_start_time: Optional[datetime] = None
         self._work_end_time: Optional[datetime] = None
         self._pause_start_time: Optional[datetime] = None
+        self._interval_start_time: Optional[datetime] = None
         self._total_break_seconds: float = 0.0
         self._break_reasons: List[str] = []
         
@@ -79,6 +80,7 @@ class WorkTracker:
             self._work_start_time = None
             self._work_end_time = None
             self._pause_start_time = None
+            self._interval_start_time = None
             self._total_break_seconds = 0.0
             self._break_reasons = []
             return
@@ -112,12 +114,14 @@ class WorkTracker:
                     self._total_break_seconds += (timestamp - pause_time).total_seconds()
                     pause_time = None
                 self._state = State.WORKING
+                self._interval_start_time = timestamp
             
             elif action == Action.END.value:
                 if pause_time:
                     self._total_break_seconds += (timestamp - pause_time).total_seconds()
                 self._state = State.ENDED
                 self._work_end_time = timestamp
+                self._interval_start_time = None
     
     @property
     def state(self) -> State:
@@ -169,6 +173,7 @@ class WorkTracker:
         
         self._state = State.WORKING
         self._work_start_time = datetime.now(timezone.utc)
+        self._interval_start_time = self._work_start_time
         self._work_end_time = None
         
         return event_id
@@ -201,6 +206,7 @@ class WorkTracker:
         
         self._state = State.PAUSED
         self._pause_start_time = datetime.now(timezone.utc)
+        self._interval_start_time = None
         self._break_reasons.append(reason)
         
         return event_id
@@ -230,6 +236,7 @@ class WorkTracker:
         
         self._state = State.WORKING
         self._pause_start_time = None
+        self._interval_start_time = datetime.now(timezone.utc)
         
         return event_id
     
@@ -258,6 +265,7 @@ class WorkTracker:
         
         self._state = State.ENDED
         self._work_end_time = datetime.now(timezone.utc)
+        self._interval_start_time = None
         
         return event_id
     
@@ -291,6 +299,19 @@ class WorkTracker:
             work_time -= current_break
         
         return max(0.0, work_time)
+    
+    def get_current_session_time(self) -> float:
+        """
+        Get the elapsed time in the CURRENT interval (since last start/resume).
+        
+        Returns:
+            Elapsed session time in seconds
+        """
+        if self._state != State.WORKING or self._interval_start_time is None:
+            return 0.0
+            
+        now = datetime.now(timezone.utc)
+        return (now - self._interval_start_time).total_seconds()
     
     def get_stats_for_date(self, date: str) -> TimeStats:
         """
@@ -511,5 +532,6 @@ class WorkTracker:
         self._work_start_time = None
         self._work_end_time = None
         self._pause_start_time = None
+        self._interval_start_time = None
         self._total_break_seconds = 0.0
         self._break_reasons = []
