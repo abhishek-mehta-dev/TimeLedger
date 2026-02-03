@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from datetime import datetime
 from typing import Optional
+import os
+from PIL import Image, ImageTk
 
 from .tracker import WorkTracker, InvalidTransitionError, State
 from .report import generate_today_report
@@ -248,13 +250,24 @@ class TimeLedgerApp:
         header_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
         header_frame.pack(fill=tk.X, pady=(0, 25))
         
-        tk.Label(
-            header_frame, 
-            text="TimeLedger", 
-            font=('Segoe UI Variable Display', 26, 'bold'),
-            fg=self.colors['text'],
-            bg=self.colors['bg']
-        ).pack(side=tk.LEFT)
+        # Try to load brand logo
+        try:
+            asset_path = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+            img = Image.open(asset_path)
+            # Resize to height 45 while keeping aspect ratio
+            aspect = img.width / img.height
+            img = img.resize((int(45 * aspect), 45), Image.Resampling.LANCZOS)
+            self.logo_photo = ImageTk.PhotoImage(img)
+            tk.Label(header_frame, image=self.logo_photo, bg=self.colors['bg']).pack(side=tk.LEFT)
+        except Exception as e:
+            # Fallback to text
+            tk.Label(
+                header_frame, 
+                text="TimeLedger", 
+                font=('Segoe UI Variable Display', 26, 'bold'),
+                fg=self.colors['text'],
+                bg=self.colors['bg']
+            ).pack(side=tk.LEFT)
         
         self.date_label = tk.Label(
             header_frame,
@@ -323,6 +336,15 @@ class TimeLedgerApp:
         report_frame.pack(fill=tk.X, pady=(20, 0))
         self.report_btn = self._create_modern_button(report_frame, "📊 Generate Detailed Report", self.colors['muted'], self._on_generate_report)
         self.report_btn.pack(fill=tk.X)
+
+        # Branding
+        tk.Label(
+            self.main_container, 
+            text="TimeLedger — Independently developed by Abhishek Mehta", 
+            font=('Segoe UI', 9, 'italic'), 
+            fg=self.colors['muted'], 
+            bg=self.colors['bg']
+        ).pack(side='bottom', pady=(20, 0))
 
     def _create_stat_card(self, parent, title, icon):
         """Create a styled stat card."""

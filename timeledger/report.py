@@ -227,10 +227,10 @@ def generate_report(
         
     # --- Footer ---
     curr_row += 2
-    f_cell = ws.cell(row=curr_row, column=1, value=f"Verification Hash stored in blockchain: {calculate_file_hash(filepath)[:12]}... (Immutable Log)")
+    f_cell = ws.cell(row=curr_row, column=1, value=f"Verification Hash: {calculate_file_hash(filepath)[:12]}... (Immutable Log)")
     f_cell.font = footer_font
     curr_row += 1
-    f2_cell = ws.cell(row=curr_row, column=1, value=f"Exported from TimeLedger v2.0 on {datetime.now().strftime('%Y-%m-%d at %I:%M %p')}")
+    f2_cell = ws.cell(row=curr_row, column=1, value=f"Made by Abhishek Mehta | Exported from TimeLedger v2.0 on {datetime.now().strftime('%Y-%m-%d at %I:%M %p')}")
     f2_cell.font = footer_font
 
     # --- Auto-adjust columns ---
