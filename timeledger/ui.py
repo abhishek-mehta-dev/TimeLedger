@@ -13,536 +13,436 @@ from .report import generate_today_report
 from .db import DatabaseConnectionError, test_connection
 
 
-class PauseReasonDialog(simpledialog.Dialog):
-    """Custom dialog for entering pause reason."""
-    
-    def __init__(self, parent, title="Pause Work"):
-        self.reason = None
-        super().__init__(parent, title)
-    
-    def body(self, master):
-        """Create dialog body."""
-        ttk.Label(
-            master,
-            text="Please enter the reason for your break:",
-            font=('Segoe UI', 10)
-        ).grid(row=0, column=0, padx=10, pady=(10, 5), sticky='w')
+class ModernConfirmDialog(tk.Toplevel):
+    """Custom premium-styled confirmation dialog."""
+    def __init__(self, parent, title, message, colors):
+        super().__init__(parent)
+        self.result = False
+        self.colors = colors
         
-        self.reason_entry = ttk.Entry(master, width=40, font=('Segoe UI', 10))
-        self.reason_entry.grid(row=1, column=0, padx=10, pady=5)
-        self.reason_entry.focus_set()
+        self.title(title)
+        self.geometry("380x200")
+        self.resizable(False, False)
+        self.configure(bg=colors['bg'])
         
-        return self.reason_entry
-    
-    def apply(self):
-        """Process the input."""
-        self.reason = self.reason_entry.get().strip()
+        # Center in parent
+        self.transient(parent)
+        self.grab_set()
+        
+        # UI components
+        container = tk.Frame(self, bg=colors['bg'], padx=30, pady=30)
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(
+            container, text=message, font=('Segoe UI', 11), 
+            fg=colors['text'], bg=colors['bg'], wraplength=320, justify='center'
+        ).pack(pady=(0, 25))
+        
+        btns = tk.Frame(container, bg=colors['bg'])
+        btns.pack(fill=tk.X)
+        btns.columnconfigure(0, weight=1, uniform='b')
+        btns.columnconfigure(1, weight=1, uniform='b')
+        
+        # Styling buttons
+        tk.Button(
+            btns, text="Cancel", font=('Segoe UI', 10, 'bold'),
+            bg=colors['border'], fg=colors['muted'], activebackground=colors['border'],
+            activeforeground=colors['muted'], relief=tk.FLAT,
+            padx=20, pady=8, cursor='hand2', command=self._cancel
+        ).grid(row=0, column=0, padx=(0, 10), sticky='ew')
+        
+        tk.Button(
+            btns, text="Confirm", font=('Segoe UI', 10, 'bold'),
+            bg=colors['primary'], fg='white', activebackground=colors['primary'],
+            activeforeground='white', relief=tk.FLAT,
+            padx=20, pady=8, cursor='hand2', command=self._confirm
+        ).grid(row=0, column=1, padx=(10, 0), sticky='ew')
+        
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.wait_window()
+
+    def _confirm(self):
+        self.result = True
+        self.destroy()
+
+    def _cancel(self):
+        self.result = False
+        self.destroy()
+
+
+class ModernInputDialog(tk.Toplevel):
+    """Custom premium-styled input dialog."""
+    def __init__(self, parent, title, prompt, colors):
+        super().__init__(parent)
+        self.result = None
+        self.colors = colors
+        
+        self.title(title)
+        self.geometry("420x220")
+        self.resizable(False, False)
+        self.configure(bg=colors['bg'])
+        
+        self.transient(parent)
+        self.grab_set()
+        
+        container = tk.Frame(self, bg=colors['bg'], padx=30, pady=25)
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(
+            container, text=prompt, font=('Segoe UI', 11), 
+            fg=colors['text'], bg=colors['bg']
+        ).pack(anchor='w', pady=(0, 10))
+        
+        self.entry = tk.Entry(
+            container, font=('Segoe UI', 11), bg=colors['card'],
+            relief=tk.FLAT, highlightbackground=colors['border'],
+            highlightthickness=1, insertbackground=colors['primary']
+        )
+        self.entry.pack(fill=tk.X, ipady=8, pady=(0, 20))
+        self.entry.focus_set()
+        self.entry.bind("<Return>", lambda e: self._submit())
+        
+        btns = tk.Frame(container, bg=colors['bg'])
+        btns.pack(fill=tk.X)
+        btns.columnconfigure(0, weight=1, uniform='b')
+        btns.columnconfigure(1, weight=1, uniform='b')
+        
+        tk.Button(
+            btns, text="Cancel", font=('Segoe UI', 10, 'bold'),
+            bg=colors['border'], fg=colors['muted'], relief=tk.FLAT,
+            padx=20, pady=8, cursor='hand2', command=self._cancel
+        ).grid(row=0, column=0, padx=(0, 10), sticky='ew')
+        
+        tk.Button(
+            btns, text="Confirm", font=('Segoe UI', 10, 'bold'),
+            bg=colors['primary'], fg='white', relief=tk.FLAT,
+            padx=20, pady=8, cursor='hand2', command=self._submit
+        ).grid(row=0, column=1, padx=(10, 0), sticky='ew')
+        
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.wait_window()
+
+    def _submit(self):
+        val = self.entry.get().strip()
+        if val:
+            self.result = val
+            self.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.destroy()
 
 
 class TimeLedgerApp:
-    """Main application class for TimeLedger GUI."""
+    """Main application class for TimeLedger GUI with modern overhaul."""
     
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("TimeLedger - Work Hours Tracker")
-        self.root.geometry("450x380")
+        self.root.title("TimeLedger")
+        self.root.geometry("510x720")
         self.root.resizable(False, False)
         
-        # Set app icon colors
-        self.root.configure(bg='#f0f4f8')
+        # Modern Color Palette
+        self.colors = {
+            'bg': '#F8FAFC',
+            'card': '#FFFFFF',
+            'primary': '#3B82F6',
+            'success': '#10B981',
+            'warning': '#F59E0B',
+            'danger': '#EF4444',
+            'text': '#1E293B',
+            'muted': '#64748B',
+            'border': '#E2E8F0'
+        }
+        
+        self.root.configure(bg=self.colors['bg'])
         
         # Initialize tracker
         self.tracker: Optional[WorkTracker] = None
         self.db_connected = False
-        
-        # Timer update ID
         self._timer_id: Optional[str] = None
         
-        # Build UI
-        self._create_styles()
         self._build_ui()
-        
-        # Try to connect to database
         self._connect_to_db()
-        
-        # Start timer updates
         self._update_timer()
-    
-    def _create_styles(self):
-        """Create custom ttk styles."""
-        style = ttk.Style()
-        style.theme_use('clam')
         
-        # Configure frame style
-        style.configure('Card.TFrame', background='white')
-        style.configure('App.TFrame', background='#f0f4f8')
-        
-        # Configure button styles
-        style.configure(
-            'Start.TButton',
-            font=('Segoe UI', 11, 'bold'),
-            padding=(20, 10)
-        )
-        style.map('Start.TButton',
-            background=[('active', '#28a745'), ('!disabled', '#28a745')],
-            foreground=[('!disabled', 'white')]
-        )
-        
-        style.configure(
-            'Pause.TButton',
-            font=('Segoe UI', 11, 'bold'),
-            padding=(20, 10)
-        )
-        style.map('Pause.TButton',
-            background=[('active', '#ffc107'), ('!disabled', '#ffc107')],
-            foreground=[('!disabled', 'black')]
-        )
-        
-        style.configure(
-            'Resume.TButton',
-            font=('Segoe UI', 11, 'bold'),
-            padding=(20, 10)
-        )
-        style.map('Resume.TButton',
-            background=[('active', '#17a2b8'), ('!disabled', '#17a2b8')],
-            foreground=[('!disabled', 'white')]
-        )
-        
-        style.configure(
-            'End.TButton',
-            font=('Segoe UI', 11, 'bold'),
-            padding=(20, 10)
-        )
-        style.map('End.TButton',
-            background=[('active', '#dc3545'), ('!disabled', '#dc3545')],
-            foreground=[('!disabled', 'white')]
-        )
-        
-        style.configure(
-            'Report.TButton',
-            font=('Segoe UI', 10),
-            padding=(15, 8)
-        )
-        
-        # Label styles
-        style.configure(
-            'Title.TLabel',
-            font=('Segoe UI', 18, 'bold'),
-            background='#f0f4f8',
-            foreground='#1a365d'
-        )
-        
-        style.configure(
-            'Status.TLabel',
-            font=('Segoe UI', 14),
-            background='white',
-            padding=(10, 5)
-        )
-        
-        style.configure(
-            'Timer.TLabel',
-            font=('Consolas', 32, 'bold'),
-            background='white',
-            foreground='#2c5282'
-        )
-        
-        style.configure(
-            'Date.TLabel',
-            font=('Segoe UI', 10),
-            background='#f0f4f8',
-            foreground='#4a5568'
-        )
-    
     def _build_ui(self):
-        """Build the main user interface."""
-        main_frame = ttk.Frame(self.root, style='App.TFrame')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        """Build the dashboard-style UI."""
+        # Main container with padding
+        self.main_container = tk.Frame(self.root, bg=self.colors['bg'], padx=30, pady=25)
+        self.main_container.pack(fill=tk.BOTH, expand=True)
         
-        # Title and date
-        title_frame = ttk.Frame(main_frame, style='App.TFrame')
-        title_frame.pack(fill=tk.X, pady=(0, 15))
+        # --- Header ---
+        header_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
+        header_frame.pack(fill=tk.X, pady=(0, 25))
         
-        ttk.Label(
-            title_frame,
-            text="⏱️ TimeLedger",
-            style='Title.TLabel'
+        tk.Label(
+            header_frame, 
+            text="TimeLedger", 
+            font=('Segoe UI Variable Display', 26, 'bold'),
+            fg=self.colors['text'],
+            bg=self.colors['bg']
         ).pack(side=tk.LEFT)
         
-        self.date_label = ttk.Label(
-            title_frame,
-            text=datetime.now().strftime("%A, %B %d, %Y"),
-            style='Date.TLabel'
+        self.date_label = tk.Label(
+            header_frame,
+            text=datetime.now().strftime("%A, %B %d"),
+            font=('Segoe UI', 10),
+            fg=self.colors['muted'],
+            bg=self.colors['bg']
         )
-        self.date_label.pack(side=tk.RIGHT, pady=(8, 0))
+        self.date_label.pack(side=tk.RIGHT, pady=(12, 0))
         
-        # Status card
-        status_card = ttk.Frame(main_frame, style='Card.TFrame')
-        status_card.pack(fill=tk.X, pady=(0, 15))
+        # --- Status Banner ---
+        self.status_banner = tk.Frame(self.main_container, bg=self.colors['card'], padx=15, pady=12, highlightbackground=self.colors['border'], highlightthickness=1)
+        self.status_banner.pack(fill=tk.X, pady=(0, 25))
         
-        # Add padding inside card
-        card_inner = ttk.Frame(status_card, style='Card.TFrame')
-        card_inner.pack(fill=tk.X, padx=20, pady=15)
+        tk.Label(self.status_banner, text="Status:", font=('Segoe UI', 10), fg=self.colors['muted'], bg=self.colors['card']).pack(side=tk.LEFT)
+        self.status_text = tk.Label(self.status_banner, text="Connecting...", font=('Segoe UI', 10, 'bold'), fg=self.colors['text'], bg=self.colors['card'])
+        self.status_text.pack(side=tk.LEFT, padx=8)
         
-        # Status indicator
-        status_row = ttk.Frame(card_inner, style='Card.TFrame')
-        status_row.pack(fill=tk.X)
+        self.status_dot_container = tk.Frame(self.status_banner, bg=self.colors['card'])
+        self.status_dot_container.pack(side=tk.RIGHT)
+        self.status_dot = tk.Canvas(self.status_dot_container, width=12, height=12, bg=self.colors['card'], highlightthickness=0)
+        self.status_dot.pack(padx=2)
+        self._draw_status_dot('#94A3B8')
+
+        # --- Dashboard Grid (2x2) ---
+        grid_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
+        grid_frame.pack(fill=tk.X, pady=(0, 25))
+        grid_frame.columnconfigure(0, weight=1, uniform='card_col')
+        grid_frame.columnconfigure(1, weight=1, uniform='card_col')
         
-        ttk.Label(
-            status_row,
-            text="Status:",
+        self.cards = {}
+        # Changed icons to common emojis for better compatibility
+        card_info = [
+            ('session', 'Current Session', '🕒', 0, 0),
+            ('today', 'Today Total', '📅', 0, 1),
+            ('week', 'This Week', '🗓️', 1, 0),
+            ('month', 'This Month', '📊', 1, 1)
+        ]
+        
+        for key, title, icon, r, c in card_info:
+            card = self._create_stat_card(grid_frame, title, icon)
+            padx = (0, 8) if c == 0 else (8, 0)
+            card['frame'].grid(row=r, column=c, padx=padx, pady=8, sticky='nsew')
+            self.cards[key] = card
+
+        # --- Memo Area ---
+        tk.Label(self.main_container, text="Memo", font=('Segoe UI', 11, 'bold'), fg=self.colors['text'], bg=self.colors['bg']).pack(anchor='w', pady=(0, 8))
+        self.memo_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
+        self.memo_frame.pack(fill=tk.X, pady=(0, 30))
+        
+        self.memo_entry = tk.Entry(
+            self.memo_frame, 
             font=('Segoe UI', 11),
-            background='white'
-        ).pack(side=tk.LEFT)
-        
-        self.status_label = ttk.Label(
-            status_row,
-            text="Connecting...",
-            style='Status.TLabel'
+            bg=self.colors['card'], 
+            fg=self.colors['text'],
+            relief=tk.FLAT,
+            highlightbackground=self.colors['border'],
+            highlightthickness=1,
+            insertbackground=self.colors['primary']
         )
-        self.status_label.pack(side=tk.LEFT, padx=(10, 0))
+        self.memo_entry.pack(fill=tk.X, ipady=10, padx=2)
+        self.memo_entry.insert(0, "Enter your text...")
+        self.memo_entry.bind("<FocusIn>", lambda e: self.memo_entry.delete(0, tk.END) if self.memo_entry.get() == "Enter your text..." else None)
+        self.memo_entry.bind("<Return>", lambda e: self.root.focus_set())
+
+        # --- Primary Controls ---
+        btns_container = tk.Frame(self.main_container, bg=self.colors['bg'])
+        btns_container.pack(fill=tk.X)
+        btns_container.columnconfigure(0, weight=1, uniform='btn_col')
+        btns_container.columnconfigure(1, weight=1, uniform='btn_col')
         
-        # Status indicator dot
-        self.status_dot = tk.Canvas(
-            status_row,
-            width=16,
-            height=16,
-            bg='white',
-            highlightthickness=0
-        )
-        self.status_dot.pack(side=tk.RIGHT)
-        self._draw_status_dot('#9ca3af')  # Gray initially
+        self.start_btn = self._create_modern_button(btns_container, "▶ Start Work", self.colors['success'], self._on_start)
+        self.start_btn.grid(row=0, column=0, padx=(0, 6), pady=6, sticky='ew')
         
-        # Timer display
-        timer_frame = ttk.Frame(card_inner, style='Card.TFrame')
-        timer_frame.pack(fill=tk.X, pady=(20, 0))
+        self.pause_btn = self._create_modern_button(btns_container, "⏸ Pause", self.colors['warning'], self._on_pause, fg='black')
+        self.pause_btn.grid(row=0, column=1, padx=(6, 0), pady=6, sticky='ew')
         
-        ttk.Label(
-            timer_frame,
-            text="Work Time:",
-            font=('Segoe UI', 10),
-            background='white',
-            foreground='#4a5568'
-        ).pack()
+        self.resume_btn = self._create_modern_button(btns_container, "🔄 Resume", self.colors['primary'], self._on_resume)
+        self.resume_btn.grid(row=1, column=0, padx=(0, 6), pady=6, sticky='ew')
         
-        self.timer_label = ttk.Label(
-            timer_frame,
-            text="00:00:00",
-            style='Timer.TLabel'
-        )
-        self.timer_label.pack(pady=(5, 0))
+        self.end_btn = self._create_modern_button(btns_container, "⏹ End Day", self.colors['danger'], self._on_end)
+        self.end_btn.grid(row=1, column=1, padx=(6, 0), pady=6, sticky='ew')
         
-        # Action buttons
-        buttons_frame = ttk.Frame(main_frame, style='App.TFrame')
-        buttons_frame.pack(fill=tk.X, pady=(0, 15))
+        # Report Button
+        report_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
+        report_frame.pack(fill=tk.X, pady=(20, 0))
+        self.report_btn = self._create_modern_button(report_frame, "📊 Generate Detailed Report", self.colors['muted'], self._on_generate_report)
+        self.report_btn.pack(fill=tk.X)
+
+    def _create_stat_card(self, parent, title, icon):
+        """Create a styled stat card."""
+        f = tk.Frame(parent, bg=self.colors['card'], padx=18, pady=18, highlightbackground=self.colors['border'], highlightthickness=1)
         
-        # Configure grid
-        buttons_frame.columnconfigure(0, weight=1)
-        buttons_frame.columnconfigure(1, weight=1)
+        tk.Label(f, text=f"{icon} {title}", font=('Segoe UI', 9), fg=self.colors['muted'], bg=self.colors['card']).pack(anchor='w')
+        val = tk.Label(f, text="0m", font=('Segoe UI Variable Display', 20, 'bold'), fg=self.colors['text'], bg=self.colors['card'])
+        val.pack(anchor='w', pady=(8, 0))
         
-        self.start_btn = tk.Button(
-            buttons_frame,
-            text="▶ Start Work",
-            font=('Segoe UI', 11, 'bold'),
-            bg='#28a745',
-            fg='white',
-            activebackground='#218838',
-            activeforeground='white',
+        return {'frame': f, 'label': val}
+
+    def _create_modern_button(self, parent, text, color, command, fg='white'):
+        """Create a premium styled button."""
+        btn = tk.Button(
+            parent,
+            text=text,
+            font=('Segoe UI', 10, 'bold'),
+            bg=color,
+            fg=fg,
+            activebackground=color,
+            activeforeground=fg,
             relief=tk.FLAT,
             cursor='hand2',
-            command=self._on_start
+            command=command,
+            pady=10
         )
-        self.start_btn.grid(row=0, column=0, padx=(0, 5), pady=5, sticky='ew')
-        
-        self.pause_btn = tk.Button(
-            buttons_frame,
-            text="⏸ Pause",
-            font=('Segoe UI', 11, 'bold'),
-            bg='#ffc107',
-            fg='black',
-            activebackground='#e0a800',
-            activeforeground='black',
-            relief=tk.FLAT,
-            cursor='hand2',
-            command=self._on_pause
-        )
-        self.pause_btn.grid(row=0, column=1, padx=(5, 0), pady=5, sticky='ew')
-        
-        self.resume_btn = tk.Button(
-            buttons_frame,
-            text="▶ Resume",
-            font=('Segoe UI', 11, 'bold'),
-            bg='#17a2b8',
-            fg='white',
-            activebackground='#138496',
-            activeforeground='white',
-            relief=tk.FLAT,
-            cursor='hand2',
-            command=self._on_resume
-        )
-        self.resume_btn.grid(row=1, column=0, padx=(0, 5), pady=5, sticky='ew')
-        
-        self.end_btn = tk.Button(
-            buttons_frame,
-            text="⏹ End Day",
-            font=('Segoe UI', 11, 'bold'),
-            bg='#dc3545',
-            fg='white',
-            activebackground='#c82333',
-            activeforeground='white',
-            relief=tk.FLAT,
-            cursor='hand2',
-            command=self._on_end
-        )
-        self.end_btn.grid(row=1, column=1, padx=(5, 0), pady=5, sticky='ew')
-        
-        # Generate Report button
-        self.report_btn = tk.Button(
-            main_frame,
-            text="📊 Generate Report",
-            font=('Segoe UI', 10),
-            bg='#6c757d',
-            fg='white',
-            activebackground='#5a6268',
-            activeforeground='white',
-            relief=tk.FLAT,
-            cursor='hand2',
-            command=self._on_generate_report
-        )
-        self.report_btn.pack(fill=tk.X, pady=(0, 10))
-        
-        # Connection status
-        self.connection_label = ttk.Label(
-            main_frame,
-            text="",
-            font=('Segoe UI', 9),
-            background='#f0f4f8',
-            foreground='#718096'
-        )
-        self.connection_label.pack()
-        
-        # Initial button states
-        self._update_button_states()
-    
-    def _draw_status_dot(self, color: str):
-        """Draw the status indicator dot."""
+        return btn
+
+    def _draw_status_dot(self, color):
         self.status_dot.delete('all')
-        self.status_dot.create_oval(2, 2, 14, 14, fill=color, outline='')
-    
+        self.status_dot.create_oval(1, 1, 9, 9, fill=color, outline='')
+
     def _connect_to_db(self):
-        """Attempt to connect to the database."""
         try:
             if test_connection():
                 self.db_connected = True
                 self.tracker = WorkTracker()
-                self.connection_label.configure(
-                    text="✓ Connected to MongoDB Atlas",
-                    foreground='#38a169'
-                )
-                
-                # Check if there's an active session and prompt user
                 if self.tracker.has_active_session():
                     self._prompt_session_choice()
                 else:
                     self._update_status()
             else:
-                raise DatabaseConnectionError("Connection test failed")
-        except DatabaseConnectionError as e:
+                raise DatabaseConnectionError("Conn failed")
+        except Exception:
             self.db_connected = False
-            self.connection_label.configure(
-                text="✗ Database connection failed",
-                foreground='#e53e3e'
-            )
-            self.status_label.configure(text="Disconnected")
-            self._draw_status_dot('#e53e3e')
-            
-            messagebox.showerror(
-                "Connection Error",
-                f"Failed to connect to MongoDB Atlas.\n\n"
-                f"Please ensure:\n"
-                f"1. Your .env file contains a valid MONGODB_URI\n"
-                f"2. Your IP is whitelisted in MongoDB Atlas\n"
-                f"3. Your internet connection is working\n\n"
-                f"Error: {str(e)}"
-            )
-    
-    def _prompt_session_choice(self):
-        """Prompt the user to choose between resuming previous session or starting fresh."""
-        status = "working" if self.tracker.is_working else "on a break"
-        
-        choice = messagebox.askyesno(
-            "Previous Session Detected",
-            f"You have an active session from earlier today.\n\n"
-            f"Current status: {status.title()}\n\n"
-            f"Would you like to RESUME your previous session?\n\n"
-            f"• Click 'Yes' to continue where you left off\n"
-            f"• Click 'No' to start fresh (previous session data is preserved)"
-        )
-        
-        if choice:
-            # User wants to resume - keep the restored state
-            self._update_status()
-        else:
-            # User wants to start fresh - reset the state
-            self.tracker.reset_state()
-            self._update_status()
-            messagebox.showinfo(
-                "Fresh Start",
-                "Starting fresh! Your previous session data is still saved in the database.\n\n"
-                "Click 'Start Work' when you're ready to begin."
-            )
-    
+            self.status_text.configure(text="Disconnected", fg=self.colors['danger'])
+            self._draw_status_dot(self.colors['danger'])
+
     def _update_status(self):
-        """Update the status display based on tracker state."""
-        if not self.tracker:
-            return
+        if not self.tracker: return
         
-        status_text = self.tracker.get_status_text()
-        self.status_label.configure(text=status_text)
+        text = self.tracker.get_status_text()
+        self.status_text.configure(text=text)
         
-        # Update status dot color
-        color_map = {
-            State.IDLE: '#9ca3af',      # Gray
-            State.WORKING: '#38a169',   # Green
-            State.PAUSED: '#f6ad55',    # Orange
-            State.ENDED: '#e53e3e'      # Red
+        cmap = {
+            State.IDLE: '#94A3B8',
+            State.WORKING: self.colors['success'],
+            State.PAUSED: self.colors['warning'],
+            State.ENDED: self.colors['danger']
         }
-        self._draw_status_dot(color_map.get(self.tracker.state, '#9ca3af'))
-        
+        self._draw_status_dot(cmap.get(self.tracker.state, '#94A3B8'))
         self._update_button_states()
-    
+
     def _update_button_states(self):
-        """Update button enabled/disabled states and colors."""
-        # Disabled styling
-        disabled_bg = '#cccccc'
-        disabled_fg = '#666666'
+        db_bg = '#E2E8F0'
+        db_fg = '#94A3B8'
         
-        if not self.tracker or not self.db_connected:
-            for btn in [self.start_btn, self.pause_btn, self.resume_btn, self.end_btn]:
-                btn.configure(state=tk.DISABLED, bg=disabled_bg, fg=disabled_fg)
-            return
+        configs = [
+            (self.start_btn, self.tracker.can_start(), self.colors['success'], 'white'),
+            (self.pause_btn, self.tracker.can_pause(), self.colors['warning'], 'black'),
+            (self.resume_btn, self.tracker.can_resume(), self.colors['primary'], 'white'),
+            (self.end_btn, self.tracker.can_end(), self.colors['danger'], 'white')
+        ]
         
-        # Define enabled colors for each button
-        button_config = {
-            'start': (self.start_btn, self.tracker.can_start(), '#28a745', 'white'),
-            'pause': (self.pause_btn, self.tracker.can_pause(), '#ffc107', 'black'),
-            'resume': (self.resume_btn, self.tracker.can_resume(), '#17a2b8', 'white'),
-            'end': (self.end_btn, self.tracker.can_end(), '#dc3545', 'white'),
-        }
-        
-        for name, (btn, can_act, enabled_bg, enabled_fg) in button_config.items():
-            if can_act:
-                btn.configure(state=tk.NORMAL, bg=enabled_bg, fg=enabled_fg)
+        for btn, enabled, bg, fg in configs:
+            if enabled:
+                btn.configure(state=tk.NORMAL, bg=bg, fg=fg)
             else:
-                btn.configure(state=tk.DISABLED, bg=disabled_bg, fg=disabled_fg)
-    
+                btn.configure(state=tk.DISABLED, bg=db_bg, fg=db_fg)
+
+    def _format_seconds(self, s):
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        sec = int(s % 60)
+        return f"{h:02d}:{m:02d}:{sec:02d}"
+
     def _update_timer(self):
-        """Update the elapsed time display."""
         if self.tracker and self.db_connected:
+            # Current Session
             elapsed = self.tracker.get_elapsed_work_time()
+            self.cards['session']['label'].configure(text=self._format_seconds(elapsed))
             
-            hours = int(elapsed // 3600)
-            minutes = int((elapsed % 3600) // 60)
-            seconds = int(elapsed % 60)
+            # Today
+            today_stats = self.tracker.get_today_stats()
+            self.cards['today']['label'].configure(text=self._format_seconds(today_stats.work_seconds))
             
-            self.timer_label.configure(
-                text=f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-            )
+            # Week & Month (maybe only update every 10s to be efficient)
+            if not hasattr(self, '_long_update_counter'): self._long_update_counter = 0
+            self._long_update_counter += 1
+            
+            if self._long_update_counter >= 10:
+                self._long_update_counter = 0
+                week_stats = self.tracker.get_weekly_stats()
+                month_stats = self.tracker.get_monthly_stats()
+                self.cards['week']['label'].configure(text=self._format_seconds(week_stats.work_seconds))
+                self.cards['month']['label'].configure(text=self._format_seconds(month_stats.work_seconds))
         
-        # Schedule next update
         self._timer_id = self.root.after(1000, self._update_timer)
-    
+
+    # ... keeping event handlers similar but updated for new UI ...
+    def _prompt_session_choice(self):
+        diag = ModernConfirmDialog(
+            self.root, "Resume Session?", 
+            "You have an active session. Would you like to resume it?", 
+            self.colors
+        )
+        if not diag.result: self.tracker.reset_state()
+        self._update_status()
+
     def _on_start(self):
-        """Handle Start Work button click."""
-        if not self.tracker:
-            return
-        
         try:
             self.tracker.start_work()
             self._update_status()
-        except InvalidTransitionError as e:
-            messagebox.showwarning("Cannot Start", str(e))
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to start work: {e}")
-    
+        except Exception as e: messagebox.showerror("Error", str(e))
+
     def _on_pause(self):
-        """Handle Pause button click."""
-        if not self.tracker:
-            return
-        
-        # Show reason dialog
-        dialog = PauseReasonDialog(self.root)
-        
-        if dialog.reason:
+        diag = ModernInputDialog(
+            self.root, "Pause Reason", 
+            "Please enter the reason for your break:", 
+            self.colors
+        )
+        if diag.result:
             try:
-                self.tracker.pause_work(dialog.reason)
+                self.tracker.pause_work(diag.result)
                 self._update_status()
-            except (InvalidTransitionError, ValueError) as e:
-                messagebox.showwarning("Cannot Pause", str(e))
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to pause: {e}")
-    
+            except Exception as e: messagebox.showerror("Error", str(e))
+
     def _on_resume(self):
-        """Handle Resume button click."""
-        if not self.tracker:
-            return
-        
         try:
             self.tracker.resume_work()
             self._update_status()
-        except InvalidTransitionError as e:
-            messagebox.showwarning("Cannot Resume", str(e))
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to resume: {e}")
-    
+        except Exception as e: messagebox.showerror("Error", str(e))
+
     def _on_end(self):
-        """Handle End Day button click."""
-        if not self.tracker:
-            return
-        
-        # Confirm action
-        if not messagebox.askyesno(
-            "End Day",
-            "Are you sure you want to end your work day?\n\n"
-            "This action cannot be undone and will lock today's records."
-        ):
-            return
-        
-        try:
-            self.tracker.end_day()
-            self._update_status()
-            
-            # Offer to generate report
-            if messagebox.askyesno(
-                "Generate Report",
-                "Day ended successfully!\n\n"
-                "Would you like to generate today's CSV report?"
-            ):
-                self._on_generate_report()
+        diag = ModernConfirmDialog(
+            self.root, "End Day", 
+            "Are you sure you want to end your work day?", 
+            self.colors
+        )
+        if diag.result:
+            try:
+                self.tracker.end_day()
+                self._update_status()
                 
-        except InvalidTransitionError as e:
-            messagebox.showwarning("Cannot End Day", str(e))
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to end day: {e}")
-    
+                rep_diag = ModernConfirmDialog(
+                    self.root, "Generate Report", 
+                    "Day ended! Would you like to generate today's report?", 
+                    self.colors
+                )
+                if rep_diag.result: self._on_generate_report()
+            except Exception as e: messagebox.showerror("Error", str(e))
+
     def _on_generate_report(self):
-        """Handle Generate Report button click."""
         try:
-            filepath = generate_today_report()
-            messagebox.showinfo(
-                "Report Generated",
-                f"Report saved successfully!\n\n📁 {filepath}"
-            )
-        except Exception as e:
-            messagebox.showerror(
-                "Report Error",
-                f"Failed to generate report:\n\n{e}"
-            )
-    
+            path = generate_today_report()
+            messagebox.showinfo("Success", f"Report saved: {path}")
+        except Exception as e: messagebox.showerror("Error", str(e))
+
     def on_closing(self):
-        """Handle window close event."""
-        if self._timer_id:
-            self.root.after_cancel(self._timer_id)
+        if self._timer_id: self.root.after_cancel(self._timer_id)
         self.root.destroy()
+
 
 
 def create_app() -> tk.Tk:

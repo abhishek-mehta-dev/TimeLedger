@@ -3,12 +3,12 @@ Tracker module for TimeLedger - State management and time calculations.
 Enforces valid state transitions and computes work/break durations.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Optional, List
 from dataclasses import dataclass
 
-from .db import insert_event, get_events_for_date, get_today_events
+from .db import insert_event, get_events_for_date, get_today_events, get_events_for_range
 
 
 class State(Enum):
@@ -365,6 +365,109 @@ class WorkTracker:
             last_end=last_end
         )
     
+    def get_stats_for_range(self, start_date: str, end_date: str) -> TimeStats:
+        """
+        Calculate aggregate time statistics for a date range.
+        
+        Args:
+            start_date: Start date string (YYYY-MM-DD)
+            end_date: End date string (YYYY-MM-DD)
+            
+        Returns:
+            TimeStats object with aggregated values
+        """
+        events = get_events_for_range(start_date, end_date)
+        
+        if not events:
+            return TimeStats(0, 0, 0, 0, [], None, None)
+            
+        # Group events by date
+        events_by_date = {}
+        for event in events:
+            date = event.get("date")
+            if date not in events_by_date:
+                events_by_date[date] = []
+            events_by_date[date].append(event)
+            
+        total_work_seconds = 0.0
+        total_break_seconds = 0.0
+        total_break_count = 0
+        all_reasons = []
+        first_start = None
+        last_end = None
+        
+        for date, date_events in events_by_date.items():
+            # For each date, calculate stats
+            # This logic is similar to get_stats_for_date but we aggregate
+            d_first_start = None
+            d_last_end = None
+            d_pause_time = None
+            d_break_seconds = 0.0
+            d_break_count = 0
+            
+            for event in date_events:
+                action = event.get("action")
+                ts = datetime.fromisoformat(event.get("timestamp", "").replace("Z", "+00:00"))
+                
+                if action == Action.START.value:
+                    if not d_first_start: d_first_start = ts
+                    if not first_start or ts < first_start: first_start = ts
+                elif action == Action.PAUSE.value:
+                    d_pause_time = ts
+                    d_break_count += 1
+                    all_reasons.append(event.get("reason", "No reason"))
+                elif action == Action.RESUME.value:
+                    if d_pause_time:
+                        d_break_seconds += (ts - d_pause_time).total_seconds()
+                        d_pause_time = None
+                elif action == Action.END.value:
+                    d_last_end = ts
+                    if not last_end or ts > last_end: last_end = ts
+                    if d_pause_time:
+                        d_break_seconds += (ts - d_pause_time).total_seconds()
+            
+            if d_first_start and d_last_end:
+                span = (d_last_end - d_first_start).total_seconds()
+                total_work_seconds += max(0, span - d_break_seconds)
+                total_break_seconds += d_break_seconds
+                total_break_count += d_break_count
+                
+        return TimeStats(
+            total_span_seconds=total_work_seconds + total_break_seconds,
+            break_seconds=total_break_seconds,
+            work_seconds=total_work_seconds,
+            break_count=total_break_count,
+            break_reasons=all_reasons,
+            first_start=first_start,
+            last_end=last_end
+        )
+
+    def get_weekly_stats(self) -> TimeStats:
+        """Get stats for the current week (Mon-Sun)."""
+        now = datetime.now()
+        start_of_week = now - timedelta(days=now.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        
+        return self.get_stats_for_range(
+            start_of_week.strftime("%Y-%m-%d"),
+            end_of_week.strftime("%Y-%m-%d")
+        )
+        
+    def get_monthly_stats(self) -> TimeStats:
+        """Get stats for the current month."""
+        now = datetime.now()
+        start_of_month = now.replace(day=1)
+        # End of month is tricky, but we can just use end_date = now for current activity
+        # or calculate last day of month. For stats display, "This Month" usually means up to now.
+        import calendar
+        last_day = calendar.monthrange(now.year, now.month)[1]
+        end_of_month = now.replace(day=last_day)
+        
+        return self.get_stats_for_range(
+            start_of_month.strftime("%Y-%m-%d"),
+            end_of_month.strftime("%Y-%m-%d")
+        )
+
     def get_today_stats(self) -> TimeStats:
         """Get statistics for today."""
         return self.get_stats_for_date(self._get_today())

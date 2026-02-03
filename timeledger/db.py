@@ -127,6 +127,32 @@ def get_events_for_date(date: str) -> List[Dict[str, Any]]:
     return events
 
 
+def get_events_for_range(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve all events between two dates (inclusive), ordered by timestamp.
+    
+    Args:
+        start_date: Start date string in YYYY-MM-DD
+        end_date: End date string in YYYY-MM-DD
+    
+    Returns:
+        List of event documents
+    """
+    collection = get_events_collection()
+    
+    events = list(collection.find(
+        {
+            "date": {
+                "$gte": start_date,
+                "$lte": end_date
+            }
+        },
+        {"_id": 0}
+    ).sort("created_at", 1))
+    
+    return events
+
+
 def get_today_events() -> List[Dict[str, Any]]:
     """Get all events for today."""
     today = datetime.now().strftime("%Y-%m-%d")
