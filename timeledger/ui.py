@@ -12,6 +12,7 @@ from PIL import Image, ImageTk
 
 from .tracker import WorkTracker, InvalidTransitionError, State
 from .report import generate_today_report
+from .sheets import append_daily_summary
 from .db import DatabaseConnectionError, test_connection
 
 
@@ -337,6 +338,9 @@ class TimeLedgerApp:
         self.report_btn = self._create_modern_button(report_frame, "📊 Generate Detailed Report", self.colors['muted'], self._on_generate_report)
         self.report_btn.pack(fill=tk.X)
 
+        self.sync_btn = self._create_modern_button(report_frame, "☁️ Sync to Google Sheets", self.colors['muted'], self._on_sync_sheets)
+        self.sync_btn.pack(fill=tk.X, pady=(10, 0))
+
         # Branding
         tk.Label(
             self.main_container, 
@@ -508,15 +512,33 @@ class TimeLedgerApp:
                     self.colors
                 )
                 if rep_diag.result: self._on_generate_report()
+                
+                # --- Auto Sync to Google Sheets ---
+                today = datetime.now().strftime("%Y-%m-%d")
+                success = append_daily_summary(today)
+                if success:
+                    ModernInfoDialog(self.root, "Cloud Sync", f"Daily summary successfully synced to Google Sheets!", self.colors)
+                else:
+                    print("Google Sheets: Initial sync failed or credentials missing.")
             except Exception as e: 
                 ModernErrorDialog(self.root, "Error", str(e), self.colors)
 
     def _on_generate_report(self):
         try:
-            path = generate_today_report()
-            ModernInfoDialog(self.root, "Success", f"Report saved:\n{path}", self.colors)
-        except Exception as e: 
-            ModernErrorDialog(self.root, "Error", str(e), self.colors)
+            today = datetime.now().strftime("%Y-%m-%d")
+            filepath = generate_today_report()
+            ModernInfoDialog(self.root, "Report Exported", f"Professional Excel report generated:\n{os.path.basename(filepath)}", self.colors)
+        except Exception as e:
+            ModernErrorDialog(self.root, "Export Failed", str(e), self.colors)
+
+    def _on_sync_sheets(self):
+        """Manual trigger for Google Sheets sync."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        success = append_daily_summary(today)
+        if success:
+            ModernInfoDialog(self.root, "Sync Success", "Data successfully appended to your Google Sheet!", self.colors)
+        else:
+            ModernErrorDialog(self.root, "Sync Failed", "Could not sync to Google Sheets.\nCheck 'credentials.json' and GOOGLE_SHEET_URL in .env", self.colors)
 
     def on_closing(self):
         if self._timer_id: self.root.after_cancel(self._timer_id)
