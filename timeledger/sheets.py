@@ -3,7 +3,7 @@ from google.oauth2.service_account import Credentials
 import os
 import json
 from .tracker import WorkTracker
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # Scopes required for Google Sheets API
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -56,6 +56,14 @@ def append_daily_summary(date: str) -> bool:
         spreadsheet = client.open_by_url(sheet_url)
         worksheet = spreadsheet.get_worksheet(0) # Use the first tab
 
+        # Header check: If worksheet is empty, add professional headers
+        if not worksheet.get_all_values():
+            headers = [
+                "DATE", "FIRST START", "LAST END", "WORK DURATION", 
+                "BREAK DURATION", "TOTAL SPAN", "PRODUCTIVITY %", "LAST SYNC (LOCAL)"
+            ]
+            worksheet.append_row(headers)
+
         # 3. Get daily stats
         tracker = WorkTracker()
         stats = tracker.get_stats_for_date(date)
@@ -64,32 +72,40 @@ def append_daily_summary(date: str) -> bool:
             print(f"Google Sheets Log: No activity for {date}")
             return False
 
-        # 4. Prepare row data
-        # Columns: Date, First Start, Last End, Work Duration, Break Duration, Total Span, Productivity %
-        first_start = stats.first_start.strftime("%I:%M %p") if stats.first_start else "N/A"
-        last_end = stats.last_end.strftime("%I:%M %p") if stats.last_end else "N/A"
-        
+        # 4. Helper for local time conversion
+        def to_local_str(dt):
+            if not dt: return "N/A"
+            # stats.first_start is already a datetime object (often UTC-naive or aware)
+            # Ensure it's treated correctly and converted to local time
+            if dt.tzinfo is None:
+                from datetime import timezone
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone().strftime("%I:%M:%S %p")
+
+        # 5. Helper for duration formatting (HH:MM:SS)
         def format_dur(seconds):
             h = int(seconds // 3600)
             m = int((seconds % 3600) // 60)
-            return f"{h}h {m}m"
+            s = int(seconds % 60)
+            return f"{h:02d}:{m:02d}:{s:02d}"
 
+        # 6. Prepare row data
         prod_ratio = 0.0
         if stats.total_span_seconds > 0:
             prod_ratio = (stats.work_seconds / stats.total_span_seconds) * 100
 
         row = [
             date,
-            first_start,
-            last_end,
+            to_local_str(stats.first_start),
+            to_local_str(stats.last_end),
             format_dur(stats.work_seconds),
             format_dur(stats.break_seconds),
             format_dur(stats.total_span_seconds),
             f"{prod_ratio:.1f}%",
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Sync Time
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Sync Time is already local
         ]
 
-        # 5. Append row
+        # 7. Append row
         worksheet.append_row(row)
         print(f"Google Sheets: Sync successful for {date}")
         return True
