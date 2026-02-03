@@ -60,6 +60,7 @@ class WorkTracker:
         self._state = State.IDLE
         self._current_date = datetime.now().strftime("%Y-%m-%d")
         self._work_start_time: Optional[datetime] = None
+        self._work_end_time: Optional[datetime] = None
         self._pause_start_time: Optional[datetime] = None
         self._total_break_seconds: float = 0.0
         self._break_reasons: List[str] = []
@@ -76,6 +77,7 @@ class WorkTracker:
             self._current_date = today
             self._state = State.IDLE
             self._work_start_time = None
+            self._work_end_time = None
             self._pause_start_time = None
             self._total_break_seconds = 0.0
             self._break_reasons = []
@@ -115,6 +117,7 @@ class WorkTracker:
                 if pause_time:
                     self._total_break_seconds += (timestamp - pause_time).total_seconds()
                 self._state = State.ENDED
+                self._work_end_time = timestamp
     
     @property
     def state(self) -> State:
@@ -166,6 +169,7 @@ class WorkTracker:
         
         self._state = State.WORKING
         self._work_start_time = datetime.now(timezone.utc)
+        self._work_end_time = None
         
         return event_id
     
@@ -253,6 +257,7 @@ class WorkTracker:
         event_id = insert_event(Action.END.value, self._current_date)
         
         self._state = State.ENDED
+        self._work_end_time = datetime.now(timezone.utc)
         
         return event_id
     
@@ -268,16 +273,21 @@ class WorkTracker:
         
         if self._work_start_time is None:
             return 0.0
+            
+        # Determine the end time for calculation
+        if self._state == State.ENDED and self._work_end_time:
+            end_time = self._work_end_time
+        else:
+            end_time = datetime.now(timezone.utc)
         
-        now = datetime.now(timezone.utc)
-        total_elapsed = (now - self._work_start_time).total_seconds()
+        total_elapsed = (end_time - self._work_start_time).total_seconds()
         
         # Subtract completed breaks
         work_time = total_elapsed - self._total_break_seconds
         
         # If currently paused, subtract current break time
         if self._state == State.PAUSED and self._pause_start_time:
-            current_break = (now - self._pause_start_time).total_seconds()
+            current_break = (end_time - self._pause_start_time).total_seconds()
             work_time -= current_break
         
         return max(0.0, work_time)
@@ -384,3 +394,19 @@ class WorkTracker:
     def can_end(self) -> bool:
         """Check if End Day action is available."""
         return self._state in (State.WORKING, State.PAUSED)
+    
+    def has_active_session(self) -> bool:
+        """Check if there's an active session that was restored."""
+        return self._state in (State.WORKING, State.PAUSED)
+    
+    def reset_state(self):
+        """
+        Reset the tracker state to IDLE for a fresh start.
+        This does NOT delete any database records - it only resets the in-memory state.
+        """
+        self._state = State.IDLE
+        self._work_start_time = None
+        self._work_end_time = None
+        self._pause_start_time = None
+        self._total_break_seconds = 0.0
+        self._break_reasons = []

@@ -338,7 +338,12 @@ class TimeLedgerApp:
                     text="✓ Connected to MongoDB Atlas",
                     foreground='#38a169'
                 )
-                self._update_status()
+                
+                # Check if there's an active session and prompt user
+                if self.tracker.has_active_session():
+                    self._prompt_session_choice()
+                else:
+                    self._update_status()
             else:
                 raise DatabaseConnectionError("Connection test failed")
         except DatabaseConnectionError as e:
@@ -358,6 +363,32 @@ class TimeLedgerApp:
                 f"2. Your IP is whitelisted in MongoDB Atlas\n"
                 f"3. Your internet connection is working\n\n"
                 f"Error: {str(e)}"
+            )
+    
+    def _prompt_session_choice(self):
+        """Prompt the user to choose between resuming previous session or starting fresh."""
+        status = "working" if self.tracker.is_working else "on a break"
+        
+        choice = messagebox.askyesno(
+            "Previous Session Detected",
+            f"You have an active session from earlier today.\n\n"
+            f"Current status: {status.title()}\n\n"
+            f"Would you like to RESUME your previous session?\n\n"
+            f"• Click 'Yes' to continue where you left off\n"
+            f"• Click 'No' to start fresh (previous session data is preserved)"
+        )
+        
+        if choice:
+            # User wants to resume - keep the restored state
+            self._update_status()
+        else:
+            # User wants to start fresh - reset the state
+            self.tracker.reset_state()
+            self._update_status()
+            messagebox.showinfo(
+                "Fresh Start",
+                "Starting fresh! Your previous session data is still saved in the database.\n\n"
+                "Click 'Start Work' when you're ready to begin."
             )
     
     def _update_status(self):
@@ -380,27 +411,29 @@ class TimeLedgerApp:
         self._update_button_states()
     
     def _update_button_states(self):
-        """Update button enabled/disabled states."""
+        """Update button enabled/disabled states and colors."""
+        # Disabled styling
+        disabled_bg = '#cccccc'
+        disabled_fg = '#666666'
+        
         if not self.tracker or not self.db_connected:
-            self.start_btn.configure(state=tk.DISABLED)
-            self.pause_btn.configure(state=tk.DISABLED)
-            self.resume_btn.configure(state=tk.DISABLED)
-            self.end_btn.configure(state=tk.DISABLED)
+            for btn in [self.start_btn, self.pause_btn, self.resume_btn, self.end_btn]:
+                btn.configure(state=tk.DISABLED, bg=disabled_bg, fg=disabled_fg)
             return
         
-        # Update based on valid transitions
-        self.start_btn.configure(
-            state=tk.NORMAL if self.tracker.can_start() else tk.DISABLED
-        )
-        self.pause_btn.configure(
-            state=tk.NORMAL if self.tracker.can_pause() else tk.DISABLED
-        )
-        self.resume_btn.configure(
-            state=tk.NORMAL if self.tracker.can_resume() else tk.DISABLED
-        )
-        self.end_btn.configure(
-            state=tk.NORMAL if self.tracker.can_end() else tk.DISABLED
-        )
+        # Define enabled colors for each button
+        button_config = {
+            'start': (self.start_btn, self.tracker.can_start(), '#28a745', 'white'),
+            'pause': (self.pause_btn, self.tracker.can_pause(), '#ffc107', 'black'),
+            'resume': (self.resume_btn, self.tracker.can_resume(), '#17a2b8', 'white'),
+            'end': (self.end_btn, self.tracker.can_end(), '#dc3545', 'white'),
+        }
+        
+        for name, (btn, can_act, enabled_bg, enabled_fg) in button_config.items():
+            if can_act:
+                btn.configure(state=tk.NORMAL, bg=enabled_bg, fg=enabled_fg)
+            else:
+                btn.configure(state=tk.DISABLED, bg=disabled_bg, fg=disabled_fg)
     
     def _update_timer(self):
         """Update the elapsed time display."""
