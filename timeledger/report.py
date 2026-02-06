@@ -227,7 +227,12 @@ def generate_report(
         
     # --- Footer ---
     curr_row += 2
-    f_cell = ws.cell(row=curr_row, column=1, value=f"Verification Hash: {calculate_file_hash(filepath)[:12]}... (Immutable Log)")
+    
+    # Use a hash of the event data for verification instead of the file itself to avoid circular dependency
+    event_summary = "|".join([f"{e.get('timestamp')}:{e.get('action')}" for e in events])
+    data_hash = hashlib.sha256(event_summary.encode()).hexdigest()
+    
+    f_cell = ws.cell(row=curr_row, column=1, value=f"Verification Hash: {data_hash[:12]}... (Data Integrity Check)")
     f_cell.font = footer_font
     curr_row += 1
     f2_cell = ws.cell(row=curr_row, column=1, value=f"Made by Abhishek Mehta | Exported from TimeLedger v2.0 on {datetime.now().strftime('%Y-%m-%d at %I:%M %p')}")
@@ -247,6 +252,8 @@ def generate_report(
         ws.column_dimensions[column_letter].width = min(max_length + 4, 50)
         
     wb.save(filepath)
+    
+    # Calculate and store hash (using file hash for DB storage is fine now that file is saved)
 
     
     # Calculate and store hash
