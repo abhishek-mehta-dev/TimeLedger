@@ -28,7 +28,7 @@ A professional, premium desktop application for work hour tracking, featuring a 
 
 1. **Clone & Setup**
    ```bash
-   git clone https://github.com/yourusername/TimeLedger.git
+   git clone https://github.com/abhishek-mehta-dev/TimeLedger.git
    cd TimeLedger
    python -m venv venv
    source venv/bin/activate  # Linux/macOS
